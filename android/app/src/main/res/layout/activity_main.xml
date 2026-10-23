@@ -79,6 +79,6 @@
         android:contentDescription="@string/title_new_note"
         app:backgroundTint="@color/primary"
         app:tint="#FFFFFF"
-        app:srcCompat="@android:drawable/ic_input_add" />
+        app:srcCompat="@drawable/ic_add" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

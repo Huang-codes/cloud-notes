@@ -24,13 +24,6 @@ jobs:
         with:
           gradle-version: '8.4'
 
-      - name: 自动接受 Android SDK 协议
-        run: |
-          mkdir -p "$ANDROID_HOME/licenses" || true
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo "84831b9409646a297e704a0815eb079c6b797968" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license" || true
-
       - name: 编译 Debug APK
         run: |
           cd android
