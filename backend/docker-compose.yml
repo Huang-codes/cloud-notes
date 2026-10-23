@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  cloud-notes-api:
+    build: .
+    container_name: cloud-notes-api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - API_TOKEN=cloud-notes-secret
+      - NOTE_DB_PATH=/app/data/notes.db
+    volumes:
+      - ./data:/app/data

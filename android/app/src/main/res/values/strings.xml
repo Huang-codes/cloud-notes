@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">云笔记</string>
+    <string name="title_settings">服务器配置</string>
+    <string name="title_edit_note">编辑笔记</string>
+    <string name="title_new_note">新建笔记</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="delete">删除</string>
+    <string name="hint_title">标题</string>
+    <string name="hint_category">分类 (例如: 日常, 工作)</string>
+    <string name="hint_content">记录你的想法...</string>
+    <string name="server_address">服务器地址 (如 http://34.x.x.x:8000)</string>
+    <string name="api_token">访问密钥 (Token)</string>
+    <string name="test_connection">测试连接</string>
+</resources>
