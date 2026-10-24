@@ -11,12 +11,16 @@ import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
-    private const val PREFS_NAME = "cloud_notes_prefs"
+    private const val PREFS_NAME = "orange_notes_prefs"
     private const val KEY_BASE_URL = "base_url"
-    private const val KEY_TOKEN = "api_token"
+    private const val KEY_TOKEN = "jwt_token"
+    private const val KEY_USERNAME = "current_username"
+    private const val KEY_EMAIL = "current_email"
+    private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+    private const val KEY_DARK_MODE = "dark_mode_pref" // 0: 跟随系统, 1: 浅色, 2: 深色
 
-    private const val DEFAULT_URL = "http://10.0.2.2:8000/" // Android 模拟器访问本机，或替换为谷歌云公网 IP
-    private const val DEFAULT_TOKEN = "cloud-notes-secret"
+    // 默认内置云服务器地址
+    private const val DEFAULT_URL = "http://161.153.58.223:8000/"
 
     private var apiService: NoteApiService? = null
 
@@ -26,28 +30,61 @@ object ApiClient {
 
     fun getBaseUrl(context: Context): String {
         var url = getPrefs(context).getString(KEY_BASE_URL, DEFAULT_URL) ?: DEFAULT_URL
-        if (!url.endsWith("/")) {
-            url += "/"
-        }
+        if (!url.endsWith("/")) url += "/"
         return url
     }
 
     fun saveBaseUrl(context: Context, url: String) {
         var formatted = url.trim()
-        if (!formatted.endsWith("/")) {
-            formatted += "/"
-        }
+        if (!formatted.endsWith("/")) formatted += "/"
         getPrefs(context).edit().putString(KEY_BASE_URL, formatted).apply()
-        apiService = null // 重置实例
+        apiService = null
     }
 
-    fun getToken(context: Context): String {
-        return getPrefs(context).getString(KEY_TOKEN, DEFAULT_TOKEN) ?: DEFAULT_TOKEN
+    fun getToken(context: Context): String? {
+        return getPrefs(context).getString(KEY_TOKEN, null)
     }
 
-    fun saveToken(context: Context, token: String) {
-        getPrefs(context).edit().putString(KEY_TOKEN, token.trim()).apply()
-        apiService = null // 重置实例
+    fun saveAuth(context: Context, token: String, username: String, email: String) {
+        getPrefs(context).edit()
+            .putString(KEY_TOKEN, token.trim())
+            .putString(KEY_USERNAME, username.trim())
+            .putString(KEY_EMAIL, email.trim())
+            .apply()
+        apiService = null
+    }
+
+    fun getUsername(context: Context): String {
+        return getPrefs(context).getString(KEY_USERNAME, "橙子用户") ?: "橙子用户"
+    }
+
+    fun getEmail(context: Context): String {
+        return getPrefs(context).getString(KEY_EMAIL, "") ?: ""
+    }
+
+    fun isLoggedIn(context: Context): Boolean {
+        return !getToken(context).isNullOrBlank()
+    }
+
+    fun logout(context: Context) {
+        getPrefs(context).edit().remove(KEY_TOKEN).remove(KEY_USERNAME).remove(KEY_EMAIL).apply()
+        apiService = null
+    }
+
+    fun isBiometricEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_BIOMETRIC_ENABLED, false)
+    }
+
+    fun setBiometricEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_BIOMETRIC_ENABLED, enabled).apply()
+    }
+
+    fun getDarkModePref(context: Context): Int {
+        return getPrefs(context).getInt(KEY_DARK_MODE, 0)
+    }
+
+    fun setDarkModePref(context: Context, mode: Int) {
+        getPrefs(context).edit().putInt(KEY_DARK_MODE, mode).apply()
     }
 
     fun getService(context: Context): NoteApiService {
@@ -56,10 +93,11 @@ object ApiClient {
             val baseUrl = getBaseUrl(context)
 
             val authInterceptor = Interceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .addHeader("X-API-Token", token)
-                    .build()
-                chain.proceed(request)
+                val builder = chain.request().newBuilder()
+                if (!token.isNullOrBlank()) {
+                    builder.addHeader("Authorization", "Bearer $token")
+                }
+                chain.proceed(builder.build())
             }
 
             val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -69,8 +107,8 @@ object ApiClient {
             val client = OkHttpClient.Builder()
                 .addInterceptor(authInterceptor)
                 .addInterceptor(loggingInterceptor)
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(10, TimeUnit.SECONDS)
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
                 .build()
 
             val retrofit = Retrofit.Builder()

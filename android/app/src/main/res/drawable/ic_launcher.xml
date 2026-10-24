@@ -4,9 +4,13 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#2563EB"
+        android:fillColor="#F97316"
         android:pathData="M0,0h108v108h-108z"/>
+    <!-- 橙子图标 / 笔记符号 -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M34,24h40c5.5,0 10,4.5 10,10v40c0,5.5 -4.5,10 -10,10H34c-5.5,0 -10,-4.5 -10,-10V34c0,-5.5 4.5,-10 10,-10zM38,40h32v4H38zM38,50h32v4H38zM38,60h22v4H38z"/>
+    <path
+        android:fillColor="#FDE047"
+        android:pathData="M66,20c0,0 8,-4 10,-1s-4,8 -4,8z"/>
 </vector>

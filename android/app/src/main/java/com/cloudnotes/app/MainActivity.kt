@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.lifecycle.lifecycleScope
@@ -16,7 +17,9 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.cloudnotes.app.adapter.NoteAdapter
 import com.cloudnotes.app.api.ApiClient
+import com.cloudnotes.app.db.LocalNoteDbHelper
 import com.cloudnotes.app.model.Note
+import com.cloudnotes.app.util.BiometricHelper
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,12 +33,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fabAdd: FloatingActionButton
     private lateinit var searchView: SearchView
     private lateinit var adapter: NoteAdapter
+    private lateinit var dbHelper: LocalNoteDbHelper
 
     private var currentQuery: String? = null
+    private var isBiometricAuthenticated = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 应用深色模式偏好
+        when (ApiClient.getDarkModePref(this)) {
+            1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
+            2 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+            else -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+        }
+
+        // 检查登录状态
+        if (!ApiClient.isLoggedIn(this)) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
+
+        dbHelper = LocalNoteDbHelper(this)
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
@@ -57,11 +79,28 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(this, NoteDetailActivity::class.java)
             startActivity(intent)
         }
+
+        // 检查生物识别隐私锁
+        if (ApiClient.isBiometricEnabled(this) && !isBiometricAuthenticated) {
+            BiometricHelper.showBiometricPrompt(
+                activity = this,
+                onSuccess = {
+                    isBiometricAuthenticated = true
+                    loadNotes(currentQuery)
+                },
+                onError = {
+                    Toast.makeText(this, "安全验证失败，请重新进入", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+            )
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        loadNotes(currentQuery)
+        if (ApiClient.isLoggedIn(this)) {
+            loadNotes(currentQuery)
+        }
     }
 
     private fun setupRecyclerView() {
@@ -98,6 +137,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_trash -> {
+                startActivity(Intent(this, TrashActivity::class.java))
+                true
+            }
             R.id.action_settings -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
                 true
@@ -107,6 +150,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadNotes(query: String? = null) {
+        // 1. 离线优先：瞬间加载本地缓存
+        val localList = dbHelper.getAllNotes(query)
+        if (localList.isNotEmpty()) {
+            adapter.updateData(localList)
+            emptyView.visibility = View.GONE
+            recyclerView.visibility = View.VISIBLE
+        }
+
+        // 2. 云端异步刷新并同步
         swipeRefreshLayout.isRefreshing = true
 
         lifecycleScope.launch {
@@ -116,11 +168,16 @@ class MainActivity : AppCompatActivity() {
                     service.getNotes(query = query?.ifBlank { null })
                 }
 
-                if (response.isSuccessful) {
-                    val notes = response.body() ?: emptyList()
+                if (response.isSuccessful && response.body() != null) {
+                    val notes = response.body()!!
+                    // 存入本地缓存
+                    withContext(Dispatchers.IO) {
+                        dbHelper.saveNotes(notes)
+                    }
                     adapter.updateData(notes)
 
                     if (notes.isEmpty()) {
+                        emptyView.text = "暂无笔记\n点击右下角添加你的第一条笔记"
                         emptyView.visibility = View.VISIBLE
                         recyclerView.visibility = View.GONE
                     } else {
@@ -128,14 +185,17 @@ class MainActivity : AppCompatActivity() {
                         recyclerView.visibility = View.VISIBLE
                     }
                 } else if (response.code() == 401) {
-                    Toast.makeText(this@MainActivity, "访问密钥错误，请在设置中配置", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(this@MainActivity, "获取笔记失败: HTTP ${response.code()}", Toast.LENGTH_SHORT).show()
+                    ApiClient.logout(this@MainActivity)
+                    startActivity(Intent(this@MainActivity, LoginActivity::class.java))
+                    finish()
                 }
             } catch (e: Exception) {
-                emptyView.text = "无法连接到服务器\n请在右上角设置中检查IP与Token\n(${e.localizedMessage})"
-                emptyView.visibility = View.VISIBLE
-                recyclerView.visibility = View.GONE
+                // 处于离线模式
+                if (localList.isEmpty()) {
+                    emptyView.text = "当前处于离线模式\n暂未缓存笔记"
+                    emptyView.visibility = View.VISIBLE
+                    recyclerView.visibility = View.GONE
+                }
             } finally {
                 swipeRefreshLayout.isRefreshing = false
             }

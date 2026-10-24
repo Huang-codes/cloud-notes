@@ -7,6 +7,9 @@ data class Note(
     @SerializedName("id")
     val id: Long = 0,
 
+    @SerializedName("user_id")
+    val userId: Long = 0,
+
     @SerializedName("title")
     var title: String,
 
@@ -19,11 +22,17 @@ data class Note(
     @SerializedName("is_pinned")
     var isPinned: Boolean = false,
 
+    @SerializedName("is_locked")
+    var isLocked: Boolean = false,
+
+    @SerializedName("is_deleted")
+    var isDeleted: Boolean = false,
+
     @SerializedName("created_at")
     val createdAt: String? = null,
 
     @SerializedName("updated_at")
-    val updatedAt: String? = null
+    var updatedAt: String? = null
 ) : Serializable
 
 data class NoteRequest(
@@ -31,10 +40,34 @@ data class NoteRequest(
     val content: String,
     val category: String,
     @SerializedName("is_pinned")
-    val isPinned: Boolean
+    val isPinned: Boolean,
+    @SerializedName("is_locked")
+    val isLocked: Boolean = false
+)
+
+data class User(
+    val id: Long,
+    val username: String,
+    val email: String,
+    @SerializedName("created_at")
+    val createdAt: String? = null
+)
+
+data class AuthResponse(
+    @SerializedName("access_token")
+    val accessToken: String,
+    @SerializedName("token_type")
+    val tokenType: String,
+    val user: User
 )
 
 data class ApiResponse(
     val success: Boolean,
     val message: String
+)
+
+data class UploadResponse(
+    val success: Boolean,
+    val url: String,
+    val filename: String
 )

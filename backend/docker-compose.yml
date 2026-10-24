@@ -1,14 +1,15 @@
 version: '3.8'
 
 services:
-  cloud-notes-api:
+  orange-notes-api:
     build: .
-    container_name: cloud-notes-api
+    container_name: orange-notes-api
     restart: always
     ports:
       - "8000:8000"
     environment:
-      - API_TOKEN=cloud-notes-secret
       - NOTE_DB_PATH=/app/data/notes.db
+      - NOTE_UPLOAD_DIR=/app/uploads
     volumes:
       - ./data:/app/data
+      - ./uploads:/app/uploads

@@ -1,15 +1,24 @@
 package com.cloudnotes.app.api
 
-import com.cloudnotes.app.model.ApiResponse
-import com.cloudnotes.app.model.Note
-import com.cloudnotes.app.model.NoteRequest
+import com.cloudnotes.app.model.*
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
 
 interface NoteApiService {
 
-    @POST("api/auth/verify")
-    suspend fun verifyAuth(): Response<ApiResponse>
+    @POST("api/auth/register")
+    suspend fun register(
+        @Body body: Map<String, String>
+    ): Response<AuthResponse>
+
+    @POST("api/auth/login")
+    suspend fun login(
+        @Body body: Map<String, String>
+    ): Response<AuthResponse>
+
+    @GET("api/auth/me")
+    suspend fun getProfile(): Response<User>
 
     @GET("api/notes")
     suspend fun getNotes(
@@ -37,4 +46,23 @@ interface NoteApiService {
     suspend fun deleteNote(
         @Path("id") id: Long
     ): Response<ApiResponse>
+
+    @GET("api/notes/trash/list")
+    suspend fun getTrashNotes(): Response<List<Note>>
+
+    @POST("api/notes/{id}/restore")
+    suspend fun restoreNote(
+        @Path("id") id: Long
+    ): Response<ApiResponse>
+
+    @DELETE("api/notes/{id}/permanent")
+    suspend fun permanentlyDeleteNote(
+        @Path("id") id: Long
+    ): Response<ApiResponse>
+
+    @Multipart
+    @POST("api/upload")
+    suspend fun uploadFile(
+        @Part file: MultipartBody.Part
+    ): Response<UploadResponse>
 }

@@ -11,8 +11,8 @@ android {
         applicationId "com.cloudnotes.app"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 2
+        versionName "2.0.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -30,7 +30,6 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
-
 }
 
 dependencies {
@@ -39,6 +38,9 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
+    // 生物识别 (指纹/人脸解锁)
+    implementation 'androidx.biometric:biometric:1.1.0'
 
     // 网络与 JSON 请求 (Retrofit & OkHttp)
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
