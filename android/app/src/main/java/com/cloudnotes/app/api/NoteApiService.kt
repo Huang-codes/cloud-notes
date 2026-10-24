@@ -30,6 +30,22 @@ interface NoteApiService {
     @GET("api/auth/me")
     suspend fun getProfile(): Response<User>
 
+    @PUT("api/user/profile")
+    suspend fun updateProfile(
+        @Body body: Map<String, String>
+    ): Response<User>
+
+    @POST("api/user/change-password")
+    suspend fun changePassword(
+        @Body body: Map<String, String>
+    ): Response<ApiResponse>
+
+    @Multipart
+    @POST("api/user/avatar")
+    suspend fun uploadAvatar(
+        @Part file: MultipartBody.Part
+    ): Response<UploadResponse>
+
     @GET("api/notes")
     suspend fun getNotes(
         @Query("q") query: String? = null,

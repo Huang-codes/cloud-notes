@@ -14,6 +14,7 @@ from app.auth import hash_password, verify_password, create_access_token, decode
 from app.email_service import generate_verification_code, send_email_code
 from app.schemas import (
     UserRegisterRequest, UserLoginRequest, UserResponse, AuthTokenResponse,
+    UserUpdateProfileRequest, ChangePasswordRequest,
     SendCodeRequest, ResetPasswordRequest,
     NoteCreate, NoteUpdate, NoteResponse, ApiResponse, UploadResponse
 )
@@ -26,7 +27,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app = FastAPI(
     title="橙子笔记 API",
     description="橙子笔记 (Orange Notes) 现代云端笔记服务",
-    version="2.1.0"
+    version="2.2.0"
 )
 
 app.add_middleware(
@@ -59,7 +60,7 @@ def get_current_user(
     if payload and "uid" in payload:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, username, email, created_at FROM users WHERE id = ?", (payload["uid"],))
+        cursor.execute("SELECT id, username, email, avatar_url, created_at FROM users WHERE id = ?", (payload["uid"],))
         user = cursor.fetchone()
         conn.close()
         if user:
@@ -69,24 +70,157 @@ def get_current_user(
     if token == legacy_token:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, username, email, created_at FROM users ORDER BY id ASC LIMIT 1")
+        cursor.execute("SELECT id, username, email, avatar_url, created_at FROM users ORDER BY id ASC LIMIT 1")
         first_user = cursor.fetchone()
         if not first_user:
             pwd_hash, salt = hash_password("orange123")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
-                "INSERT INTO users (username, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-                ("orange", "admin@orange.local", pwd_hash, salt, now)
+                "INSERT INTO users (username, email, password_hash, salt, avatar_url, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                ("orange", "admin@orange.local", pwd_hash, salt, "", now)
             )
             conn.commit()
-            cursor.execute("SELECT id, username, email, created_at FROM users WHERE id = ?", (cursor.lastrowid,))
+            cursor.execute("SELECT id, username, email, avatar_url, created_at FROM users WHERE id = ?", (cursor.lastrowid,))
             first_user = cursor.fetchone()
         conn.close()
         return dict(first_user)
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭据无效或已过期，请重新登录")
 
-# ----------------- 账号系统与邮箱验证码 -----------------
+# ----------------- 账号系统、个人资料与修改密码 -----------------
+
+@app.post("/api/auth/register", response_model=AuthTokenResponse)
+def register(req: UserRegisterRequest):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (req.username, req.email.lower()))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=400, detail="用户名或邮箱已被注册")
+
+    pwd_hash, salt = hash_password(req.password)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute(
+        "INSERT INTO users (username, email, password_hash, salt, avatar_url, created_at) VALUES (?, ?, ?, ?, '', ?)",
+        (req.username.strip(), req.email.strip().lower(), pwd_hash, salt, now)
+    )
+    conn.commit()
+    user_id = cursor.lastrowid
+    conn.close()
+
+    token = create_access_token(user_id, req.username)
+    return AuthTokenResponse(
+        access_token=token,
+        user=UserResponse(id=user_id, username=req.username, email=req.email, avatar_url="", created_at=now)
+    )
+
+@app.post("/api/auth/login", response_model=AuthTokenResponse)
+def login(req: UserLoginRequest):
+    account = req.account.strip()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (account, account.lower()))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user or not verify_password(req.password, user["password_hash"], user["salt"]):
+        raise HTTPException(status_code=400, detail="账号或密码错误")
+
+    token = create_access_token(user["id"], user["username"])
+    return AuthTokenResponse(
+        access_token=token,
+        user=UserResponse(
+            id=user["id"],
+            username=user["username"],
+            email=user["email"],
+            avatar_url=user["avatar_url"] or "",
+            created_at=user["created_at"]
+        )
+    )
+
+@app.get("/api/auth/me", response_model=UserResponse)
+def get_profile(current_user: dict = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user["id"],
+        username=current_user["username"],
+        email=current_user["email"],
+        avatar_url=current_user.get("avatar_url") or "",
+        created_at=current_user["created_at"]
+    )
+
+@app.put("/api/user/profile", response_model=UserResponse)
+def update_profile(req: UserUpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    username = req.username.strip() if req.username else current_user["username"]
+    avatar_url = req.avatar_url if req.avatar_url is not None else current_user.get("avatar_url", "")
+
+    # 如果改了用户名，检查是否重复
+    if req.username and req.username != current_user["username"]:
+        cursor.execute("SELECT id FROM users WHERE username = ? AND id != ?", (username, current_user["id"]))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=400, detail="该用户名已被使用")
+
+    cursor.execute(
+        "UPDATE users SET username = ?, avatar_url = ? WHERE id = ?",
+        (username, avatar_url, current_user["id"])
+    )
+    conn.commit()
+    conn.close()
+
+    return UserResponse(
+        id=current_user["id"],
+        username=username,
+        email=current_user["email"],
+        avatar_url=avatar_url,
+        created_at=current_user["created_at"]
+    )
+
+@app.post("/api/user/change-password", response_model=ApiResponse)
+def change_password(req: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password_hash, salt FROM users WHERE id = ?", (current_user["id"],))
+    row = cursor.fetchone()
+
+    if not row or not verify_password(req.old_password, row["password_hash"], row["salt"]):
+        conn.close()
+        raise HTTPException(status_code=400, detail="原密码不正确")
+
+    new_hash, new_salt = hash_password(req.new_password)
+    cursor.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE id = ?",
+        (new_hash, new_salt, current_user["id"])
+    )
+    conn.commit()
+    conn.close()
+    return ApiResponse(success=True, message="密码修改成功")
+
+@app.post("/api/user/avatar", response_model=UploadResponse)
+async def upload_user_avatar(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    ext = os.path.splitext(file.filename)[1].lower()
+    if not ext:
+        ext = ".jpg"
+    unique_name = f"avatar_{current_user['id']}_{int(time.time())}{ext}"
+    dest_path = os.path.join(UPLOAD_DIR, unique_name)
+
+    with open(dest_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    avatar_url = f"/uploads/{unique_name}"
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET avatar_url = ? WHERE id = ?", (avatar_url, current_user["id"]))
+    conn.commit()
+    conn.close()
+
+    return UploadResponse(success=True, url=avatar_url, filename=file.filename)
 
 @app.post("/api/auth/send-code", response_model=ApiResponse)
 def send_code(req: SendCodeRequest):
@@ -101,7 +235,7 @@ def send_code(req: SendCodeRequest):
             raise HTTPException(status_code=404, detail="未找到与该邮箱关联的账号")
 
     code = generate_verification_code()
-    expires_at = int(time.time()) + 600  # 10 分钟有效期
+    expires_at = int(time.time()) + 600
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cursor.execute(
@@ -135,76 +269,16 @@ def reset_password(req: ResetPasswordRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="验证码无效或已过期")
 
-    # 更新密码
     pwd_hash, salt = hash_password(req.new_password)
     cursor.execute(
         "UPDATE users SET password_hash = ?, salt = ? WHERE email = ?",
         (pwd_hash, salt, email)
     )
-    # 删除已使用的验证码
     cursor.execute("DELETE FROM email_codes WHERE email = ?", (email,))
     conn.commit()
     conn.close()
 
     return ApiResponse(success=True, message="密码重置成功，请使用新密码登录")
-
-@app.post("/api/auth/register", response_model=AuthTokenResponse)
-def register(req: UserRegisterRequest):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (req.username, req.email.lower()))
-    if cursor.fetchone():
-        conn.close()
-        raise HTTPException(status_code=400, detail="用户名或邮箱已被注册")
-
-    pwd_hash, salt = hash_password(req.password)
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute(
-        "INSERT INTO users (username, email, password_hash, salt, created_at) VALUES (?, ?, ?, ?, ?)",
-        (req.username.strip(), req.email.strip().lower(), pwd_hash, salt, now)
-    )
-    conn.commit()
-    user_id = cursor.lastrowid
-    conn.close()
-
-    token = create_access_token(user_id, req.username)
-    return AuthTokenResponse(
-        access_token=token,
-        user=UserResponse(id=user_id, username=req.username, email=req.email, created_at=now)
-    )
-
-@app.post("/api/auth/login", response_model=AuthTokenResponse)
-def login(req: UserLoginRequest):
-    account = req.account.strip()
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (account, account.lower()))
-    user = cursor.fetchone()
-    conn.close()
-
-    if not user or not verify_password(req.password, user["password_hash"], user["salt"]):
-        raise HTTPException(status_code=400, detail="账号或密码错误")
-
-    token = create_access_token(user["id"], user["username"])
-    return AuthTokenResponse(
-        access_token=token,
-        user=UserResponse(
-            id=user["id"],
-            username=user["username"],
-            email=user["email"],
-            created_at=user["created_at"]
-        )
-    )
-
-@app.get("/api/auth/me", response_model=UserResponse)
-def get_profile(current_user: dict = Depends(get_current_user)):
-    return UserResponse(
-        id=current_user["id"],
-        username=current_user["username"],
-        email=current_user["email"],
-        created_at=current_user["created_at"]
-    )
 
 # ----------------- 笔记核心 CRUD 与软删除回收站 -----------------
 
@@ -442,7 +516,7 @@ def health_check():
     return {
         "status": "online",
         "service": "橙子笔记 (Orange Notes) API",
-        "version": "2.1.0",
+        "version": "2.2.0",
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 

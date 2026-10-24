@@ -6,15 +6,23 @@ class UserRegisterRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=32)
     email: str = Field(..., min_length=3, max_length=64)
     password: str = Field(..., min_length=6, max_length=64)
-    code: Optional[str] = None  # 选填的邮箱验证码
+    code: Optional[str] = None
 
 class UserLoginRequest(BaseModel):
     account: str = Field(..., description="用户名或邮箱")
     password: str = Field(...)
 
+class UserUpdateProfileRequest(BaseModel):
+    username: Optional[str] = Field(None, min_length=2, max_length=32)
+    avatar_url: Optional[str] = None
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str = Field(...)
+    new_password: str = Field(..., min_length=6, max_length=64)
+
 class SendCodeRequest(BaseModel):
     email: str = Field(...)
-    purpose: Optional[str] = "reset" # "reset" or "register"
+    purpose: Optional[str] = "reset"
 
 class ResetPasswordRequest(BaseModel):
     email: str = Field(...)
@@ -25,6 +33,7 @@ class UserResponse(BaseModel):
     id: int
     username: str
     email: str
+    avatar_url: Optional[str] = ""
     created_at: str
 
 class AuthTokenResponse(BaseModel):

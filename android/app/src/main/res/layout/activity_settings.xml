@@ -25,7 +25,7 @@
             android:orientation="vertical"
             android:padding="20dp">
 
-            <!-- 用户信息卡片 -->
+            <!-- 用户信息卡片 (支持点击头像更换、修改用户名) -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -42,26 +42,67 @@
                     android:gravity="center_vertical"
                     android:padding="16dp">
 
-                    <ImageView
-                        android:layout_width="48dp"
-                        android:layout_height="48dp"
-                        android:src="@drawable/ic_launcher" />
+                    <FrameLayout
+                        android:id="@+id/layoutAvatar"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <ImageView
+                            android:id="@+id/ivAvatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_launcher" />
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="#22000000" />
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="bottom|end"
+                            android:layout_margin="2dp"
+                            android:src="@drawable/ic_camera"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
 
                     <LinearLayout
+                        android:id="@+id/layoutUserInfo"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="14dp"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:clickable="true"
+                        android:focusable="true">
 
-                        <TextView
-                            android:id="@+id/tvUsername"
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="用户"
-                            android:textColor="@color/text_primary"
-                            android:textSize="17sp"
-                            android:textStyle="bold" />
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:id="@+id/tvUsername"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="用户"
+                                android:textColor="@color/text_primary"
+                                android:textSize="17sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="✎ 修改"
+                                android:textColor="@color/primary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
 
                         <TextView
                             android:id="@+id/tvEmail"
@@ -75,21 +116,60 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 功能设置项 -->
+            <!-- 账号安全 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="22dp"
                 android:layout_marginBottom="8dp"
-                android:text="偏好与安全"
+                android:text="账号与安全"
                 android:textColor="@color/primary"
                 android:textSize="13sp"
                 android:textStyle="bold" />
+
+            <!-- 修改登录密码 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardChangePassword"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/divider"
+                app:strokeWidth="1dp"
+                app:cardBackgroundColor="@color/card_bg"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="修改登录密码"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="更改 ›"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="14sp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- 生物识别/隐私锁 -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/divider"
@@ -134,10 +214,19 @@
             </com.google.android.material.card.MaterialCardView>
 
             <!-- 深色模式选择 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:layout_marginBottom="8dp"
+                android:text="偏好外观"
+                android:textColor="@color/primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
                 app:strokeColor="@color/divider"

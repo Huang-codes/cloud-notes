@@ -16,6 +16,7 @@ object ApiClient {
     private const val KEY_TOKEN = "jwt_token"
     private const val KEY_USERNAME = "current_username"
     private const val KEY_EMAIL = "current_email"
+    private const val KEY_AVATAR = "current_avatar"
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     private const val KEY_DARK_MODE = "dark_mode_pref" // 0: 跟随系统, 1: 浅色, 2: 深色
 
@@ -45,13 +46,22 @@ object ApiClient {
         return getPrefs(context).getString(KEY_TOKEN, null)
     }
 
-    fun saveAuth(context: Context, token: String, username: String, email: String) {
+    fun saveAuth(context: Context, token: String, username: String, email: String, avatarUrl: String = "") {
         getPrefs(context).edit()
             .putString(KEY_TOKEN, token.trim())
             .putString(KEY_USERNAME, username.trim())
             .putString(KEY_EMAIL, email.trim())
+            .putString(KEY_AVATAR, avatarUrl)
             .apply()
         apiService = null
+    }
+
+    fun getAvatarUrl(context: Context): String {
+        return getPrefs(context).getString(KEY_AVATAR, "") ?: ""
+    }
+
+    fun saveAvatarUrl(context: Context, url: String) {
+        getPrefs(context).edit().putString(KEY_AVATAR, url).apply()
     }
 
     fun getUsername(context: Context): String {

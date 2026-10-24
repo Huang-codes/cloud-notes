@@ -49,6 +49,8 @@ data class User(
     val id: Long,
     val username: String,
     val email: String,
+    @SerializedName("avatar_url")
+    val avatarUrl: String? = null,
     @SerializedName("created_at")
     val createdAt: String? = null
 )
