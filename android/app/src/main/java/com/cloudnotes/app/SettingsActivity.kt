@@ -12,7 +12,6 @@ import androidx.appcompat.widget.Toolbar
 import com.cloudnotes.app.api.ApiClient
 import com.cloudnotes.app.util.BiometricHelper
 import com.google.android.material.switchmaterial.SwitchMaterial
-import com.google.android.material.textfield.TextInputEditText
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -20,8 +19,6 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var tvEmail: TextView
     private lateinit var switchBiometric: SwitchMaterial
     private lateinit var tvDarkModeDesc: TextView
-    private lateinit var etServerUrl: TextInputEditText
-    private lateinit var btnSaveServer: Button
     private lateinit var btnLogout: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,13 +34,10 @@ class SettingsActivity : AppCompatActivity() {
         tvEmail = findViewById(R.id.tvEmail)
         switchBiometric = findViewById(R.id.switchBiometric)
         tvDarkModeDesc = findViewById(R.id.tvDarkModeDesc)
-        etServerUrl = findViewById(R.id.etServerUrl)
-        btnSaveServer = findViewById(R.id.btnSaveServer)
         btnLogout = findViewById(R.id.btnLogout)
 
         tvUsername.text = ApiClient.getUsername(this)
         tvEmail.text = ApiClient.getEmail(this).ifEmpty { "未绑定邮箱" }
-        etServerUrl.setText(ApiClient.getBaseUrl(this))
 
         // 指纹/应用锁
         switchBiometric.isChecked = ApiClient.isBiometricEnabled(this)
@@ -60,15 +54,6 @@ class SettingsActivity : AppCompatActivity() {
         updateDarkModeDesc()
         tvDarkModeDesc.setOnClickListener {
             showDarkModeDialog()
-        }
-
-        // 保存服务器地址
-        btnSaveServer.setOnClickListener {
-            val url = etServerUrl.text.toString().trim()
-            if (url.isNotEmpty()) {
-                ApiClient.saveBaseUrl(this, url)
-                Toast.makeText(this, "服务器配置已保存", Toast.LENGTH_SHORT).show()
-            }
         }
 
         // 退出登录

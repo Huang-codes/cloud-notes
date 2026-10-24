@@ -2,11 +2,13 @@ package com.cloudnotes.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.cloudnotes.app.api.ApiClient
@@ -27,9 +29,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var etPassword: TextInputEditText
     private lateinit var btnSubmit: Button
     private lateinit var tvToggleMode: TextView
-    private lateinit var tvToggleServerConfig: TextView
-    private lateinit var layoutServerConfig: LinearLayout
-    private lateinit var etServerUrl: TextInputEditText
+    private lateinit var tvForgotPassword: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,24 +42,14 @@ class LoginActivity : AppCompatActivity() {
         etPassword = findViewById(R.id.etPassword)
         btnSubmit = findViewById(R.id.btnSubmit)
         tvToggleMode = findViewById(R.id.tvToggleMode)
-        tvToggleServerConfig = findViewById(R.id.tvToggleServerConfig)
-        layoutServerConfig = findViewById(R.id.layoutServerConfig)
-        etServerUrl = findViewById(R.id.etServerUrl)
-
-        etServerUrl.setText(ApiClient.getBaseUrl(this))
+        tvForgotPassword = findViewById(R.id.tvForgotPassword)
 
         tvToggleMode.setOnClickListener {
             toggleMode()
         }
 
-        tvToggleServerConfig.setOnClickListener {
-            if (layoutServerConfig.visibility == View.VISIBLE) {
-                layoutServerConfig.visibility = View.GONE
-                tvToggleServerConfig.text = "高级设置：自定义服务器地址 ▼"
-            } else {
-                layoutServerConfig.visibility = View.VISIBLE
-                tvToggleServerConfig.text = "收起高级设置 ▲"
-            }
+        tvForgotPassword.setOnClickListener {
+            showForgotPasswordDialog()
         }
 
         btnSubmit.setOnClickListener {
@@ -73,23 +63,20 @@ class LoginActivity : AppCompatActivity() {
             tilUsername.visibility = View.VISIBLE
             tilAccount.hint = "电子邮箱"
             btnSubmit.text = "注 册"
-            tvToggleMode.text = "已有账号？点击返回登录"
+            tvToggleMode.text = "已有账号？返回登录"
+            tvForgotPassword.visibility = View.GONE
         } else {
             tilUsername.visibility = View.GONE
             tilAccount.hint = "账号 (用户名或电子邮箱)"
             btnSubmit.text = "登 录"
-            tvToggleMode.text = "还没有账号？点击立即注册"
+            tvToggleMode.text = "还没有账号？立即注册"
+            tvForgotPassword.visibility = View.VISIBLE
         }
     }
 
     private fun submitAuth() {
-        val serverUrl = etServerUrl.text.toString().trim()
         val account = etAccount.text.toString().trim()
         val password = etPassword.text.toString().trim()
-
-        if (serverUrl.isNotEmpty()) {
-            ApiClient.saveBaseUrl(this, serverUrl)
-        }
 
         if (account.isEmpty() || password.isEmpty()) {
             Toast.makeText(this, "请输入账号与密码", Toast.LENGTH_SHORT).show()
@@ -127,7 +114,6 @@ class LoginActivity : AppCompatActivity() {
                     startActivity(Intent(this@LoginActivity, MainActivity::class.java))
                     finish()
                 } else {
-                    val errorMsg = response.errorBody()?.string() ?: "登录失败"
                     Toast.makeText(this@LoginActivity, "登录失败: 账号或密码错误", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
@@ -167,5 +153,82 @@ class LoginActivity : AppCompatActivity() {
                 btnSubmit.text = "注 册"
             }
         }
+    }
+
+    private fun showForgotPasswordDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_forgot_password, null)
+        val etResetEmail = dialogView.findViewById<EditText>(R.id.etResetEmail)
+        val etResetCode = dialogView.findViewById<EditText>(R.id.etResetCode)
+        val etNewPassword = dialogView.findViewById<EditText>(R.id.etNewPassword)
+        val btnSendCode = dialogView.findViewById<Button>(R.id.btnSendCode)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("找回密码")
+            .setView(dialogView)
+            .setPositiveButton("重置密码", null)
+            .setNegativeButton("取消", null)
+            .create()
+
+        btnSendCode.setOnClickListener {
+            val email = etResetEmail.text.toString().trim()
+            if (email.isEmpty()) {
+                Toast.makeText(this, "请输入你的注册邮箱", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            btnSendCode.isEnabled = false
+            btnSendCode.text = "发送中..."
+            lifecycleScope.launch {
+                try {
+                    val res = withContext(Dispatchers.IO) {
+                        ApiClient.getService(this@LoginActivity).sendCode(mapOf("email" to email, "purpose" to "reset"))
+                    }
+                    if (res.isSuccessful && res.body()?.success == true) {
+                        Toast.makeText(this@LoginActivity, "验证码已发送至邮箱，请查收", Toast.LENGTH_LONG).show()
+                        btnSendCode.text = "已发送"
+                    } else {
+                        Toast.makeText(this@LoginActivity, "发送失败：未找到该邮箱", Toast.LENGTH_SHORT).show()
+                        btnSendCode.isEnabled = true
+                        btnSendCode.text = "重新发送"
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(this@LoginActivity, "发送失败: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    btnSendCode.isEnabled = true
+                    btnSendCode.text = "发送验证码"
+                }
+            }
+        }
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val email = etResetEmail.text.toString().trim()
+                val code = etResetCode.text.toString().trim()
+                val newPwd = etNewPassword.text.toString().trim()
+
+                if (email.isEmpty() || code.isEmpty() || newPwd.isEmpty()) {
+                    Toast.makeText(this, "请填写完整重置信息", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                lifecycleScope.launch {
+                    try {
+                        val res = withContext(Dispatchers.IO) {
+                            ApiClient.getService(this@LoginActivity).resetPassword(
+                                mapOf("email" to email, "code" to code, "new_password" to newPwd)
+                            )
+                        }
+                        if (res.isSuccessful && res.body()?.success == true) {
+                            Toast.makeText(this@LoginActivity, "密码重置成功，请使用新密码登录！", Toast.LENGTH_LONG).show()
+                            dialog.dismiss()
+                        } else {
+                            Toast.makeText(this@LoginActivity, "重置失败：验证码错误或已失效", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        Toast.makeText(this@LoginActivity, "重置失败: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        dialog.show()
     }
 }

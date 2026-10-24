@@ -6,10 +6,20 @@ class UserRegisterRequest(BaseModel):
     username: str = Field(..., min_length=2, max_length=32)
     email: str = Field(..., min_length=3, max_length=64)
     password: str = Field(..., min_length=6, max_length=64)
+    code: Optional[str] = None  # 选填的邮箱验证码
 
 class UserLoginRequest(BaseModel):
     account: str = Field(..., description="用户名或邮箱")
     password: str = Field(...)
+
+class SendCodeRequest(BaseModel):
+    email: str = Field(...)
+    purpose: Optional[str] = "reset" # "reset" or "register"
+
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(...)
+    code: str = Field(...)
+    new_password: str = Field(..., min_length=6, max_length=64)
 
 class UserResponse(BaseModel):
     id: int

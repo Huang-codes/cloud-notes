@@ -13,19 +13,19 @@
         android:padding="28dp"
         android:gravity="center_horizontal">
 
-        <!-- Logo与应用名 -->
+        <!-- 极简蓝白风格图标与应用名 -->
         <ImageView
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:layout_marginTop="32dp"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_marginTop="36dp"
             android:src="@drawable/ic_launcher" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="14dp"
             android:text="橙子笔记"
-            android:textColor="@color/primary"
+            android:textColor="@color/text_primary"
             android:textSize="24sp"
             android:textStyle="bold" />
 
@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="你的私有云端备忘与记事空间"
+            android:text="随手记录你的灵感与清单"
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
 
@@ -43,7 +43,7 @@
             android:id="@+id/tilUsername"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="32dp"
             android:hint="用户名"
             android:visibility="gone"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -55,7 +55,7 @@
                 android:inputType="textPersonName" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- 账号（用户名或邮箱） -->
+        <!-- 账号（用户名或电子邮箱） -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/tilAccount"
             android:layout_width="match_parent"
@@ -88,61 +88,52 @@
                 android:inputType="textPassword" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- 登录/注册按钮 -->
+        <!-- 登录/注册主按钮 -->
         <Button
             android:id="@+id/btnSubmit"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="26dp"
             android:text="登 录"
             android:textSize="16sp"
             android:textStyle="bold"
             android:backgroundTint="@color/primary"
             app:cornerRadius="12dp" />
 
-        <!-- 切换登录/注册模式 -->
-        <TextView
-            android:id="@+id/tvToggleMode"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="还没有账号？点击立即注册"
-            android:textColor="@color/primary"
-            android:textSize="14sp"
-            android:clickable="true"
-            android:focusable="true" />
-
-        <!-- 可折叠的服务器地址配置（高级） -->
-        <TextView
-            android:id="@+id/tvToggleServerConfig"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="高级设置：自定义服务器地址 ▼"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
-
+        <!-- 切换登录/注册与找回密码 -->
         <LinearLayout
-            android:id="@+id/layoutServerConfig"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="8dp"
-            android:visibility="gone">
+            android:orientation="horizontal"
+            android:layout_marginTop="20dp"
+            android:gravity="center">
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/tvToggleMode"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:hint="服务器地址"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                android:text="还没有账号？立即注册"
+                android:textColor="@color/primary"
+                android:textSize="13sp"
+                android:clickable="true"
+                android:focusable="true" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etServerUrl"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textUri"
-                    android:text="http://161.153.58.223:8000/" />
-            </com.google.android.material.textfield.TextInputLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="  |  "
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvForgotPassword"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="忘记密码？"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:clickable="true"
+                android:focusable="true" />
         </LinearLayout>
 
     </LinearLayout>

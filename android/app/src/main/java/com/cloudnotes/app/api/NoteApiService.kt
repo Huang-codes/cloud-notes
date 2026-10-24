@@ -17,6 +17,16 @@ interface NoteApiService {
         @Body body: Map<String, String>
     ): Response<AuthResponse>
 
+    @POST("api/auth/send-code")
+    suspend fun sendCode(
+        @Body body: Map<String, String>
+    ): Response<ApiResponse>
+
+    @POST("api/auth/reset-password")
+    suspend fun resetPassword(
+        @Body body: Map<String, String>
+    ): Response<ApiResponse>
+
     @GET("api/auth/me")
     suspend fun getProfile(): Response<User>
 

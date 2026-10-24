@@ -1,5 +1,6 @@
 import os
 import uuid
+import time
 import shutil
 from datetime import datetime
 from typing import List, Optional
@@ -10,8 +11,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import get_connection, init_db
 from app.auth import hash_password, verify_password, create_access_token, decode_access_token
+from app.email_service import generate_verification_code, send_email_code
 from app.schemas import (
     UserRegisterRequest, UserLoginRequest, UserResponse, AuthTokenResponse,
+    SendCodeRequest, ResetPasswordRequest,
     NoteCreate, NoteUpdate, NoteResponse, ApiResponse, UploadResponse
 )
 
@@ -23,7 +26,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 app = FastAPI(
     title="橙子笔记 API",
     description="橙子笔记 (Orange Notes) 现代云端笔记服务",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 app.add_middleware(
@@ -34,14 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 挂载上传文件服务
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 def get_current_user(
     authorization: Optional[str] = Header(None),
     x_api_token: Optional[str] = Header(None, alias="X-API-Token")
 ) -> dict:
-    """从 Authorization Bearer 或 Token 解析当前用户"""
     token = None
     if authorization and authorization.startswith("Bearer "):
         token = authorization[7:].strip()
@@ -54,7 +55,6 @@ def get_current_user(
             detail="请先登录橙子笔记账号"
         )
 
-    # 优先解析 JWT Token
     payload = decode_access_token(token)
     if payload and "uid" in payload:
         conn = get_connection()
@@ -65,7 +65,6 @@ def get_current_user(
         if user:
             return dict(user)
 
-    # 兼容历史密钥模式（自动关联到默认管理员账号）
     legacy_token = os.environ.get("API_TOKEN", "cloud-notes-secret")
     if token == legacy_token:
         conn = get_connection()
@@ -73,7 +72,6 @@ def get_current_user(
         cursor.execute("SELECT id, username, email, created_at FROM users ORDER BY id ASC LIMIT 1")
         first_user = cursor.fetchone()
         if not first_user:
-            # 自动初始化默认用户
             pwd_hash, salt = hash_password("orange123")
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             cursor.execute(
@@ -88,15 +86,74 @@ def get_current_user(
 
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="登录凭据无效或已过期，请重新登录")
 
-# ----------------- 账号系统 (用户注册、登录、信息) -----------------
+# ----------------- 账号系统与邮箱验证码 -----------------
+
+@app.post("/api/auth/send-code", response_model=ApiResponse)
+def send_code(req: SendCodeRequest):
+    email = req.email.strip().lower()
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if req.purpose == "reset":
+        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="未找到与该邮箱关联的账号")
+
+    code = generate_verification_code()
+    expires_at = int(time.time()) + 600  # 10 分钟有效期
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        "INSERT INTO email_codes (email, code, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        (email, code, req.purpose or "reset", expires_at, now)
+    )
+    conn.commit()
+    conn.close()
+
+    purpose_text = "重置密码" if req.purpose == "reset" else "注册验证"
+    send_email_code(email, code, purpose_text)
+    return ApiResponse(success=True, message="验证码已发送至邮箱")
+
+@app.post("/api/auth/reset-password", response_model=ApiResponse)
+def reset_password(req: ResetPasswordRequest):
+    email = req.email.strip().lower()
+    code = req.code.strip()
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id FROM email_codes 
+        WHERE email = ? AND code = ? AND expires_at > ? 
+        ORDER BY id DESC LIMIT 1
+        """,
+        (email, code, int(time.time()))
+    )
+    valid_code = cursor.fetchone()
+    if not valid_code:
+        conn.close()
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+
+    # 更新密码
+    pwd_hash, salt = hash_password(req.new_password)
+    cursor.execute(
+        "UPDATE users SET password_hash = ?, salt = ? WHERE email = ?",
+        (pwd_hash, salt, email)
+    )
+    # 删除已使用的验证码
+    cursor.execute("DELETE FROM email_codes WHERE email = ?", (email,))
+    conn.commit()
+    conn.close()
+
+    return ApiResponse(success=True, message="密码重置成功，请使用新密码登录")
 
 @app.post("/api/auth/register", response_model=AuthTokenResponse)
 def register(req: UserRegisterRequest):
     conn = get_connection()
     cursor = conn.cursor()
 
-    # 检查用户名与邮箱是否已存在
-    cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (req.username, req.email))
+    cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (req.username, req.email.lower()))
     if cursor.fetchone():
         conn.close()
         raise HTTPException(status_code=400, detail="用户名或邮箱已被注册")
@@ -122,7 +179,6 @@ def login(req: UserLoginRequest):
     account = req.account.strip()
     conn = get_connection()
     cursor = conn.cursor()
-    # 支持用户名或邮箱登录
     cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (account, account.lower()))
     user = cursor.fetchone()
     conn.close()
@@ -296,7 +352,6 @@ def update_note(note_id: int, note_update: NoteUpdate, current_user: dict = Depe
 
 @app.delete("/api/notes/{note_id}", response_model=ApiResponse)
 def delete_to_trash(note_id: int, current_user: dict = Depends(get_current_user)):
-    """软删除：放入回收站"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -310,11 +365,8 @@ def delete_to_trash(note_id: int, current_user: dict = Depends(get_current_user)
         raise HTTPException(status_code=404, detail="笔记不存在")
     return ApiResponse(success=True, message="已移入回收站")
 
-# ----------------- 回收站功能 -----------------
-
 @app.get("/api/notes/trash/list", response_model=List[NoteResponse])
 def get_trash_notes(current_user: dict = Depends(get_current_user)):
-    """获取回收站内的笔记"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -340,7 +392,6 @@ def get_trash_notes(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/notes/{note_id}/restore", response_model=ApiResponse)
 def restore_note(note_id: int, current_user: dict = Depends(get_current_user)):
-    """从回收站恢复笔记"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -356,7 +407,6 @@ def restore_note(note_id: int, current_user: dict = Depends(get_current_user)):
 
 @app.delete("/api/notes/{note_id}/permanent", response_model=ApiResponse)
 def permanently_delete_note(note_id: int, current_user: dict = Depends(get_current_user)):
-    """彻底删除笔记"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM notes WHERE id = ? AND user_id = ?", (note_id, current_user["id"]))
@@ -367,14 +417,11 @@ def permanently_delete_note(note_id: int, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="笔记不存在")
     return ApiResponse(success=True, message="已彻底删除")
 
-# ----------------- 附件 / 图片上传接口 -----------------
-
 @app.post("/api/upload", response_model=UploadResponse)
 async def upload_attachment(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """支持上传图片和附件"""
     ext = os.path.splitext(file.filename)[1].lower()
     if not ext:
         ext = ".jpg"
@@ -395,11 +442,10 @@ def health_check():
     return {
         "status": "online",
         "service": "橙子笔记 (Orange Notes) API",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-# 挂载 Web 端静态页面
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

@@ -219,9 +219,12 @@
         <button id="authSubmitBtn" onclick="submitAuth()" class="w-full py-2.5 bg-orange-500 hover:bg-orange-600 active:scale-95 text-white font-medium rounded-lg text-sm transition">登录</button>
       </div>
 
-      <div class="text-center pt-1 text-xs">
-        <span id="authToggleText" class="text-slate-400">还没有账号？</span>
-        <button id="authToggleBtn" onclick="toggleAuthMode()" class="text-orange-500 font-semibold hover:underline ml-1">立即注册</button>
+      <div class="text-center pt-1 text-xs flex justify-between items-center text-slate-400">
+        <div>
+          <span id="authToggleText">还没有账号？</span>
+          <button id="authToggleBtn" onclick="toggleAuthMode()" class="text-orange-500 font-semibold hover:underline ml-1">立即注册</button>
+        </div>
+        <button onclick="promptResetPassword()" class="text-slate-400 hover:text-slate-600 text-xs">忘记密码？</button>
       </div>
     </div>
   </div>
@@ -269,6 +272,28 @@
     }
 
     // 深色模式控制
+    async function promptResetPassword() {
+      const email = prompt('请输入你绑定的邮箱：');
+      if (!email) return;
+      try {
+        await apiRequest('/api/auth/send-code', {
+          method: 'POST',
+          body: JSON.stringify({ email, purpose: 'reset' })
+        });
+        const code = prompt('验证码已发送至邮箱，请输入6位验证码：');
+        if (!code) return;
+        const newPassword = prompt('请输入新密码（不少于6位）：');
+        if (!newPassword) return;
+        await apiRequest('/api/auth/reset-password', {
+          method: 'POST',
+          body: JSON.stringify({ email, code, new_password: newPassword })
+        });
+        alert('密码重置成功，请使用新密码登录！');
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
     function toggleDarkMode() {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('ORANGE_DARK_MODE', isDark ? '1' : '0');

@@ -24,6 +24,18 @@ def init_db():
         )
     """)
 
+    # 邮箱验证码表 (用于邮箱验证与找回密码)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS email_codes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL,
+            code TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    """)
+
     # 笔记表（关联 user_id，支持软删除 is_deleted，支持隐私锁 is_locked）
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS notes (
@@ -41,7 +53,7 @@ def init_db():
         )
     """)
 
-    # 兼容历史数据库结构的迁移：确保字段存在
+    # 兼容历史数据库结构的迁移
     cursor.execute("PRAGMA table_info(notes)")
     columns = [col["name"] for col in cursor.fetchall()]
     
