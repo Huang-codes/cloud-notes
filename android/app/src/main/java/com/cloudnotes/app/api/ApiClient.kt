@@ -20,8 +20,8 @@ object ApiClient {
     private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     private const val KEY_DARK_MODE = "dark_mode_pref" // 0: 跟随系统, 1: 浅色, 2: 深色
 
-    // 默认内置云服务器地址
-    private const val DEFAULT_URL = "http://161.153.58.223:8000/"
+    // 默认内置云服务器地址 (使用已绑定的专属域名)
+    private const val DEFAULT_URL = "https://muchen.krystal1122.dpdns.org/"
 
     private var apiService: NoteApiService? = null
 
@@ -31,6 +31,10 @@ object ApiClient {
 
     fun getBaseUrl(context: Context): String {
         var url = getPrefs(context).getString(KEY_BASE_URL, DEFAULT_URL) ?: DEFAULT_URL
+        if (url.contains("161.153.58.223") || url.contains("eric.krystal1122.dpdns.org")) {
+            url = DEFAULT_URL
+            saveBaseUrl(context, url)
+        }
         if (!url.endsWith("/")) url += "/"
         return url
     }
