@@ -9,7 +9,7 @@ import com.cloudnotes.app.model.Note
 class LocalNoteDbHelper(context: Context) : SQLiteOpenHelper(context, "orange_notes_local.db", null, 1) {
 
     override fun onCreate(db: SQLiteDatabase) {
-        db.executeSQL("""
+        db.execSQL("""
             CREATE TABLE local_notes (
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER,
@@ -27,7 +27,7 @@ class LocalNoteDbHelper(context: Context) : SQLiteOpenHelper(context, "orange_no
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.executeSQL("DROP TABLE IF EXISTS local_notes")
+        db.execSQL("DROP TABLE IF EXISTS local_notes")
         onCreate(db)
     }
 
